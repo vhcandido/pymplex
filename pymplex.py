@@ -15,11 +15,14 @@ class Model:
         self.A = np.matrix(data['A'])
         self.b = np.array(data['b'])
         self.m, self.n = np.shape(self.A)
+        self.n_ori = self.n
 
         self.x = np.array([])
 
         self.debug = debug
         self.B_i = {}
+        self.N_i = None
+        self.iteration = 0
 
     def __standart_form(self):
         # change function objective to minimization
@@ -81,59 +84,81 @@ class Model:
     def __iterate(self):
         B_i = self.B_i
         N_i = self.N_i
-        B_inv = np.linalg.inv(self.A[:, B_i]) # invert base
-        b = self.b[np.newaxis].T # transpose b array
-        x_B = B_inv * b
-        x_B = np.array(x_B)[:, 0] # transform matrix into array
+        A = self.A
+        c = self.c.copy()
 
-        # current solution
-        c_B = self.c[B_i]
-        self.function = c_B * x_B
+        while 1:
+            B_inv = np.linalg.inv(A[:, B_i]) # invert base
+            b = self.b[np.newaxis].T # transpose b array
+            x_B = B_inv * b
+            x_B = np.array(x_B)[:, 0] # transform matrix into array
 
-        # lambda - simplex multiplier
-        lam = c_B * B_inv
+            # current solution
+            if self.debug:
+                print "\n# Iteration: ", self.iteration
+                print "B_i: ", B_i
+                print "x_B: ", x_B
+                print "c_B: ", c[B_i]
+            self.function = np.dot(c[B_i], x_B)
 
-        # new relative costs
-        self.c[N_i] = self.c[N_i] - lam * A[:, N_i]
+            # lambda - simplex multiplier
+            lam = c[B_i] * B_inv
 
-        # if costs are all negative then the solution was found
-        if (self.c[N_i] >= 0).all():
-            print "Solution found"
-            exit()
+            # new relative costs
+            c_N = c[N_i] - lam * A[:, N_i]
+            if self.debug:
+                print "c_N: ", c_N
 
-        # find who is going to enter the base
-        goes_in_i = np.argmin(self.c[N_i])
-        goes_in = N_i[goes_in_i]
+            # if costs are all negative then the solution was found
+            if (c_N >= 0).all():
+                self.status = 'optimal'
+                if (c_N == 0).any():
+                    self.message = "Multiple optimal solution"
+                else:
+                    self.message = "Optimal solution"
+                self.x[B_i] = x_B
+                break
 
-        # calculate directions
-        y = B_inv * A[:, goes_in]
-        # if it's not positive then the problem has no limited solution
-        if (y <= 0).all():
-            print "Unbounded optimal solution"
-            exit()
+            # find who is going to enter the base
+            goes_in_i = np.argmin(c_N)
+            goes_in = N_i[goes_in_i]
 
-        # find who is going to leave the base
-        y = np.array(y)[:, 0]
+            # calculate directions
+            y = B_inv * A[:, goes_in]
+            # if it's not positive then the problem has no limited solution
+            if (y <= 0).all():
+                self.message = "Unbounded optimal solution"
+                self.status = 'unbound'
+                break
 
-        #eps = []
-        #for i in range(m):
-        #    if y[i] > 0:
-        #        eps.append(x[i] / y[i])
-        eps = np.apply_along_axis(lambda(x,y): x/y if y>0 else np.inf, 1, zip(x_B, y))
-        goes_out_i = np.argmin(e)
-        goes_out = B_i[goes_out_i]
+            # find who is going to leave the base
+            y = np.array(y)[:, 0]
 
-        # update base
-        B_i[goes_out_i], N_i[goes_in_i] = N_i[goes_in_i], B_i[goes_out_i]
-        self.x[B_i] = x_B
-        self.B_i = B_i
-        self.N_i = N_i
-        self.iteration += 1
+            #eps = []
+            #for i in range(m):
+            #    if y[i] > 0:
+            #        eps.append(x[i] / y[i])
+            eps = np.apply_along_axis(lambda(x,y): x/y if y>0 else np.inf, 1, zip(x_B, y))
+            goes_out_i = np.argmin(eps)
+            goes_out = B_i[goes_out_i]
+
+            # update base
+            B_i[goes_out_i], N_i[goes_in_i] = N_i[goes_in_i], B_i[goes_out_i]
+            self.x[B_i] = x_B
+            self.B_i = B_i
+            self.N_i = N_i
+            self.iteration += 1
 
     def solve(self):
+        if self.debug:
+            self.print_problem()
+
         self.__standart_form()
         # n gets a new value (old_n + slack_variables)
-        m, self.n = np.shape(self.A)
+        _, self.n = np.shape(self.A)
+
+        # initial values for all variables
+        self.x = np.zeros(self.n)
 
         # go to phase I if there are not enough variables in the base
         if self.m > len(self.B_i):
@@ -141,7 +166,14 @@ class Model:
             # n gets a new value (old_n + artificial_variables)
             m, self.n = np.shape(self.A)
 
+        if self.debug:
+            self.print_problem()
+
+        # make list out of dictionary
+        self.B_i = self.B_i.values()
+
         # go to phase II
+        self.N_i = list(set(range(self.n)) - set(self.B_i))
         self.__iterate()
 
     def print_problem(self):
@@ -153,6 +185,14 @@ class Model:
         print '\nA:\n', self.A
         print '\nb: ', self.b
         print '#'*30
+
+    def print_solution(self):
+        print self.message
+        if self.status == 'optimal':
+            print "Result: ", self.function
+            self.B_i.sort()
+            for i in range(self.n_ori):
+                print "x%d = %d" % (i+1, self.x[self.B_i[i]])
 
 
 
@@ -168,8 +208,7 @@ def main(input_file):
     model = Model(read_json(input_file), debug=True)
 
     model.solve()
-    model.print_problem()
-    #model.print_solution()
+    model.print_solution()
 
 
 
