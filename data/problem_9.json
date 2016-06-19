@@ -1,0 +1,8 @@
+{
+	"name": "Example of an unbounded problem",
+	"obj": "min",
+	"C": [-2, -3],
+	"b": [2],
+	"A": [[1, 2]],
+	"inq": [">="]
+}
