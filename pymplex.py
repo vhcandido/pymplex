@@ -73,6 +73,8 @@ class Model:
 
         # fill with zeros -> m lines and as much columns as varibles needed
         self.A = np.hstack((self.A, np.zeros((self.m, len(need_var)))))
+        M = np.array([99999] * len(need_var))
+        self.c = np.concatenate((self.c, M))
 
         # place 1 at the right spot and update the base index
         col = self.n
@@ -88,6 +90,10 @@ class Model:
         c = self.c.copy()
 
         while 1:
+            if self.debug:
+                print "A:\n", A
+                print
+                print "B_i: ", B_i
             B_inv = np.linalg.inv(A[:, B_i]) # invert base
             b = self.b[np.newaxis].T # transpose b array
             x_B = B_inv * b
@@ -99,7 +105,12 @@ class Model:
                 print "B_i: ", B_i
                 print "x_B: ", x_B
                 print "c_B: ", c[B_i]
-            self.function = np.dot(c[B_i], x_B)
+            #self.function = np.dot(c[B_i], x_B)
+            f = 0
+            for i in range(self.m):
+                if B_i[i] < self.n_ori:
+                    f += c[B_i[i]] * x_B[i]
+            self.function = f
 
             # lambda - simplex multiplier
             lam = c[B_i] * B_inv
@@ -129,6 +140,7 @@ class Model:
             if (y <= 0).all():
                 self.message = "Unbounded optimal solution"
                 self.status = 'unbound'
+                self.x[B_i] = x_B
                 break
 
             # find who is going to leave the base
@@ -143,8 +155,14 @@ class Model:
             goes_out = B_i[goes_out_i]
 
             # update base
+            if self.debug:
+                print 'Goes in: ', goes_in
+                print 'y: ', y
+                print 'eps: ', eps
+                print 'Goes out: ', goes_out
             B_i[goes_out_i], N_i[goes_in_i] = N_i[goes_in_i], B_i[goes_out_i]
             self.x[B_i] = x_B
+            self.x[N_i] = 0
             self.B_i = B_i
             self.N_i = N_i
             self.iteration += 1
@@ -157,14 +175,15 @@ class Model:
         # n gets a new value (old_n + slack_variables)
         _, self.n = np.shape(self.A)
 
-        # initial values for all variables
-        self.x = np.zeros(self.n)
 
         # go to phase I if there are not enough variables in the base
         if self.m > len(self.B_i):
             self.__artificial_variables()
             # n gets a new value (old_n + artificial_variables)
             m, self.n = np.shape(self.A)
+
+        # initial values for all variables
+        self.x = np.zeros(self.n)
 
         if self.debug:
             self.print_problem()
@@ -191,8 +210,12 @@ class Model:
         if self.status == 'optimal':
             print "Result: ", self.function
             self.B_i.sort()
+            if self.debug:
+                print "x: ", self.x
+                print "B_i: ", self.B_i
             for i in range(self.n_ori):
-                print "x%d = %d" % (i+1, self.x[self.B_i[i]])
+                #print "x%d = %f" % (i+1, self.x[self.B_i[i]])
+                print "x%d = %f" % (i+1, self.x[i])
 
 
 
