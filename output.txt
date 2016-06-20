@@ -10,7 +10,7 @@ x3 = 2.000000
 
 Problem 2
 Optimal solution
-Result:  -1.83333333333
+Result:  1.83333333333
 x1 = 1.000000
 x2 = 0.500000
 x3 = 0.333333
@@ -28,7 +28,7 @@ x4 = 1.000000
 
 Problem 4
 Optimal solution
-Result:  -40.0
+Result:  40.0
 x1 = 10.000000
 x2 = 0.000000
 x3 = 0.000000
@@ -57,7 +57,7 @@ Unbounded optimal solution
 
 Problem 8
 Optimal solution
-Result:  -70.0
+Result:  70.0
 x1 = 7.000000
 x2 = 0.000000
 x3 = 0.000000
@@ -73,7 +73,7 @@ Infeasible solution
 
 Problem 11
 Optimal solution
-Result:  -40.0
+Result:  40.0
 x1 = 10.000000
 x2 = 0.000000
 x3 = 0.000000
