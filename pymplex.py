@@ -8,6 +8,7 @@ class Model:
     def __init__(self, data, debug=False):
         self.name = data['name']
         self.obj = data['obj']
+        self.obj_ori = self.obj
 
         self.c = np.array(data['C'])
 
@@ -23,7 +24,7 @@ class Model:
         self.debug = debug
         self.B_i = {}
         self.N_i = None
-        self.iteration = 0
+        self.iteration = 1
 
     def __standart_form(self):
         # change function objective to minimization
@@ -74,7 +75,7 @@ class Model:
 
         # fill with zeros -> m lines and as much columns as varibles needed
         self.A = np.hstack((self.A, np.zeros((self.m, len(need_var)))))
-        M = np.array([99999] * len(need_var))
+        M = np.array([100000] * len(need_var))
         self.c = np.concatenate((self.c, M))
 
         # place 1 at the right spot and update the base index
@@ -104,7 +105,9 @@ class Model:
 
             # current solution
             if self.debug:
-                print "\n# Iteration: ", self.iteration
+                print '\n\n'
+                print '#'*80
+                print "# ITERATION: ", self.iteration
                 print "B_i: ", B_i
                 print "x_B: ", x_B
                 print "c_B: ", c[B_i]
@@ -134,6 +137,7 @@ class Model:
             # new relative costs
             c_N = c[N_i] - lam * A[:, N_i]
             if self.debug:
+                print 'lambda: ', lam
                 print "c_N: ", c_N
 
             # if costs are all negative then the solution was found
@@ -157,6 +161,9 @@ class Model:
                         self.message = "Multiple optimal solution"
                     else:
                         self.message = "Optimal solution"
+
+                    if self.obj_ori == 'max':
+                        self.function *= -1
                     self.x[B_i] = x_B
                 break
 
@@ -199,12 +206,16 @@ class Model:
 
     def solve(self):
         if self.debug:
+            print "INITIAL PROBLEM"
             self.print_problem()
 
         self.__standart_form()
         # n gets a new value (old_n + slack_variables)
         _, self.n = np.shape(self.A)
 
+        if self.debug:
+            print "STANDART FORM"
+            self.print_problem()
 
         # go to phase I if there are not enough variables in the base
         if self.m > len(self.B_i):
@@ -212,11 +223,13 @@ class Model:
             # n gets a new value (old_n + artificial_variables)
             m, self.n = np.shape(self.A)
 
+            if self.debug:
+                print "ARTIFICIAL VARIABLES ADDED"
+                self.print_problem()
+
         # initial values for all variables
         self.x = np.zeros(self.n)
 
-        if self.debug:
-            self.print_problem()
 
         # make list out of dictionary
         self.B_i = self.B_i.values()
@@ -226,14 +239,20 @@ class Model:
         self.__iterate()
 
     def print_problem(self):
-        print '#'*30
+        print '#'*40
         print 'Problem: ', self.name
-        print '\nObjective: ', self.obj
-        print '\nCosts: ', self.c
-        print '\nConstraints: ', self.R
-        print '\nA:\n', self.A
-        print '\nb: ', self.b
-        print '#'*30
+        c = ' '.join('%10.4f' % j for j in self.c)
+        print self.obj, c
+        for i in range(self.m):
+            a = ' '.join('%10.4f' % j for j in np.squeeze(np.array(self.A[i])))
+            print "%s %s %f" % (a, self.R[i], self.b[i])
+        print '\n\n'
+
+        #print '\nObjective: ', self.obj
+        #print '\nCosts: ', self.c
+        #print '\nConstraints: ', self.R
+        #print '\nA:\n', self.A
+        #print '\nb: ', self.b
 
     def print_solution(self):
         print self.message
